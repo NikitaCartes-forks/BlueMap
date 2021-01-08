@@ -24,29 +24,23 @@
  */
 package de.bluecolored.bluemap.core.render.hires;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.io.OutputStreamWriter;
-import java.io.PrintWriter;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Path;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.Set;
-
 import com.flowpowered.math.vector.Vector2i;
 import com.flowpowered.math.vector.Vector3d;
 import com.flowpowered.math.vector.Vector3i;
-
 import de.bluecolored.bluemap.core.logger.Logger;
 import de.bluecolored.bluemap.core.render.RenderSettings;
 import de.bluecolored.bluemap.core.render.WorldTile;
 import de.bluecolored.bluemap.core.resourcepack.ResourcePack;
 import de.bluecolored.bluemap.core.util.AABB;
+import de.bluecolored.bluemap.core.util.Compression;
 import de.bluecolored.bluemap.core.util.FileUtils;
-import de.bluecolored.bluemap.core.CompressionConfig;
+
+import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.Set;
 
 public class HiresModelManager {
 
@@ -56,20 +50,20 @@ public class HiresModelManager {
 	private Vector2i tileSize;
 	private Vector2i gridOrigin;
 	
-	private CompressionConfig compressionType;
+	private Compression compression;
 	
 	public HiresModelManager(Path fileRoot, ResourcePack resourcePack, RenderSettings renderSettings, Vector2i tileSize) {
-		this(fileRoot, new HiresModelRenderer(resourcePack, renderSettings), tileSize, new Vector2i(2, 2), renderSettings.getCompressionType());
+		this(fileRoot, new HiresModelRenderer(resourcePack, renderSettings), tileSize, new Vector2i(2, 2), renderSettings.getCompression());
 	}
 	
-	public HiresModelManager(Path fileRoot, HiresModelRenderer renderer, Vector2i tileSize, Vector2i gridOrigin, CompressionConfig compressionType) {
+	public HiresModelManager(Path fileRoot, HiresModelRenderer renderer, Vector2i tileSize, Vector2i gridOrigin, Compression compression) {
 		this.fileRoot = fileRoot;
 		this.renderer = renderer;
 		
 		this.tileSize = tileSize;
 		this.gridOrigin = gridOrigin;
 		
-		this.compressionType = compressionType;
+		this.compression = compression;
 	}
 	
 	/**
@@ -87,7 +81,7 @@ public class HiresModelManager {
 	}
 	
 	private void save(HiresModel model, String modelJson){
-		File file = getFile(model.getTile(), compressionType.getFileExtension());
+		File file = getFile(model.getTile());
 		
 		try {
 			if (!file.exists()){
@@ -95,7 +89,7 @@ public class HiresModelManager {
 				file.createNewFile();
 			}
 	
-			OutputStream os = compressionType.getOutputStream(new FileOutputStream(file));
+			OutputStream os = compression.createOutputStream(new FileOutputStream(file));
 			
 			OutputStreamWriter osw = new OutputStreamWriter(os, StandardCharsets.UTF_8);
 			try (
@@ -185,8 +179,8 @@ public class HiresModelManager {
 	/**
 	 * Returns the file for a tile
 	 */
-	public File getFile(Vector2i tilePos, String fileExtension){
-		return FileUtils.coordsToFile(fileRoot, tilePos, fileExtension);
+	public File getFile(Vector2i tilePos){
+		return FileUtils.coordsToFile(fileRoot, tilePos, "json" + compression.getCompressionType().getFileExtension());
 	}
 	
 }

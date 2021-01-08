@@ -24,29 +24,11 @@
  */
 package de.bluecolored.bluemap.common;
 
-import java.io.File;
-import java.io.IOException;
-import java.net.URL;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-
-import org.apache.commons.io.FileUtils;
-
 import com.flowpowered.math.vector.Vector2i;
-
 import de.bluecolored.bluemap.common.plugin.Plugin;
 import de.bluecolored.bluemap.common.plugin.serverinterface.ServerInterface;
 import de.bluecolored.bluemap.core.MinecraftVersion;
-import de.bluecolored.bluemap.core.config.ConfigManager;
-import de.bluecolored.bluemap.core.config.CoreConfig;
-import de.bluecolored.bluemap.core.config.MapConfig;
-import de.bluecolored.bluemap.core.config.RenderConfig;
-import de.bluecolored.bluemap.core.config.WebServerConfig;
+import de.bluecolored.bluemap.core.config.*;
 import de.bluecolored.bluemap.core.logger.Logger;
 import de.bluecolored.bluemap.core.mca.MCAWorld;
 import de.bluecolored.bluemap.core.render.RenderSettings;
@@ -59,6 +41,12 @@ import de.bluecolored.bluemap.core.web.WebFilesManager;
 import de.bluecolored.bluemap.core.web.WebSettings;
 import de.bluecolored.bluemap.core.world.SlicedWorld;
 import de.bluecolored.bluemap.core.world.World;
+import org.apache.commons.io.FileUtils;
+
+import java.io.File;
+import java.io.IOException;
+import java.net.URL;
+import java.util.*;
 
 /**
  * This is the attempt to generalize as many actions as possible to have CLI and Plugins run on the same general setup-code.
@@ -207,7 +195,7 @@ public class BlueMapService {
 					getRenderConfig().getWebRoot().toPath().resolve("data").resolve(id).resolve("lowres"), 
 					new Vector2i(mapConfig.getLowresPointsPerLowresTile(), mapConfig.getLowresPointsPerLowresTile()),
 					new Vector2i(mapConfig.getLowresPointsPerHiresTile(), mapConfig.getLowresPointsPerHiresTile()),
-					mapConfig.getCompressionType()
+					mapConfig.getCompression()
 					);
 			
 			TileRenderer tileRenderer = new TileRenderer(hiresModelManager, lowresModelManager);
