@@ -103,7 +103,7 @@ public class MapConfig implements RenderSettings {
 		//renderEdges
 		this.renderEdges = node.getNode("renderEdges").getBoolean(true);
 
-		//compression and compressionLevel
+		//compressionType and compressionLevel
 		this.compression = loadCompressionSettings(node);
 
 		//ignoreMissingLightData
@@ -130,13 +130,13 @@ public class MapConfig implements RenderSettings {
 		}
 
 		//backwards-compatibility for 'useCompression' setting
-		if (node.getNode("compression").isVirtual()){
+		if (node.getNode("compressionType").isVirtual()){
 			boolean useCompression = node.getNode("useCompression").getBoolean(true);
 			compressionType = useCompression ? CompressionType.GZIP : CompressionType.PLAIN;
 		}
 
 		int compressionLevel = node.getNode("compressionLevel").getInt(-1);
-
+		
 		//check brotli availabillity
 		if (compressionType == CompressionType.BROTLI && !BrotliLoader.isBrotliAvailable()){
 			Logger.global.logWarning("Library for brotli-compression is unavailable! Falling back to gzip for map '" + this.id + "'!");
