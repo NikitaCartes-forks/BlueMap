@@ -11,10 +11,10 @@ dependencies {
    compile 'org.spongepowered:configurate-hocon:3.7.1'
    compile 'org.spongepowered:configurate-gson:3.7.1'
    compile 'com.github.Querz:NBT:4.0'
-   compile group: 'com.aayushatharva.brotli4j', name: 'brotli4j', version: '1.2.2'
-   compile group: 'com.aayushatharva.brotli4j', name: 'native-linux_x86-64', version: '1.2.2'
-   compile group: 'com.aayushatharva.brotli4j', name: 'native-macos_x86-64', version: '1.2.2'
-   compile group: 'com.aayushatharva.brotli4j', name: 'native-windows_x86-64', version: '1.2.2'
+   compile group: 'com.aayushatharva.brotli4j', name: 'brotli4j', version: '1.3.0'
+   compile group: 'com.aayushatharva.brotli4j', name: 'native-linux-x86_64', version: '1.3.0'
+   compile group: 'com.aayushatharva.brotli4j', name: 'native-osx-x86_64', version: '1.3.0'
+   compile group: 'com.aayushatharva.brotli4j', name: 'native-windows-x86_64', version: '1.3.0'
    testCompile 'junit:junit:4.12'
 }
 
