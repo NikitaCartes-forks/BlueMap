@@ -37,7 +37,6 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
-import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 import org.apache.commons.io.IOUtils;
@@ -48,11 +47,12 @@ import de.bluecolored.bluemap.core.webserver.HttpRequestHandler;
 import de.bluecolored.bluemap.core.webserver.HttpResponse;
 import de.bluecolored.bluemap.core.webserver.HttpStatusCode;
 
+import de.bluecolored.bluemap.core.util.CompressionType;
+
 public class FileRequestHandler implements HttpRequestHandler {
 
 	private static final long DEFLATE_MIN_SIZE = 10L * 1024L;
 	private static final long DEFLATE_MAX_SIZE = 10L * 1024L * 1024L;
-	private static final long INFLATE_MAX_SIZE = 10L * 1024L * 1024L;
 	
 	private Path webRoot;
 	private String serverName;
@@ -95,9 +95,8 @@ public class FileRequestHandler implements HttpRequestHandler {
 			return new HttpResponse(HttpStatusCode.NOT_FOUND);
 		}
 		
-		//can we use deflation?
-		boolean isDeflationPossible = request.getLowercaseHeader("Accept-Encoding").contains("gzip");
-		boolean isDeflated = false;
+		// Determine what compression we are using
+		CompressionType usedCompressionType = CompressionType.PLAIN;
 		
 		//check if file is in web-root
 		if (!filePath.normalize().startsWith(webRoot.normalize())){
@@ -115,29 +114,29 @@ public class FileRequestHandler implements HttpRequestHandler {
 		
 		if (!file.exists() || file.isDirectory()){
 			file = new File(filePath.toString() + ".gz");
-			isDeflated = true;
+			usedCompressionType = CompressionType.GZIP;
+			if (!file.exists()) {
+				file = new File(filePath.toString() + ".br");
+				usedCompressionType = CompressionType.BROTLI;
+			}
 		}
 		
 		if (!file.exists() || file.isDirectory()){
 			file = new File(filePath.toString() + "/index.html");
-			isDeflated = false;
+			usedCompressionType = CompressionType.PLAIN;
 		}
 		
 		if (!file.exists() || file.isDirectory()){
 			file = new File(filePath.toString() + "/index.html.gz");
-			isDeflated = true;
+			usedCompressionType = CompressionType.GZIP;
+			if (!file.exists()) {
+				file = new File(filePath.toString() + "/index.html.br");
+				usedCompressionType = CompressionType.BROTLI;
+			}
 		}
 		
 		if (!file.exists()){
 			return new HttpResponse(HttpStatusCode.NOT_FOUND);
-		}
-		
-		if (isDeflationPossible && (!file.getName().endsWith(".gz"))){
-			File deflatedFile = new File(file.getAbsolutePath() + ".gz");
-			if (deflatedFile.exists()){
-				file = deflatedFile;
-				isDeflated = true;
-			}
 		}
 		
 		//check if file is still in web-root
@@ -175,7 +174,7 @@ public class FileRequestHandler implements HttpRequestHandler {
 		
 		//add content type header
 		String filetype = file.getName().toString();
-		if (filetype.endsWith(".gz")) filetype = filetype.substring(0, filetype.length() - 3);
+		if (filetype.endsWith(".gz") || filetype.endsWith(".br")) filetype = filetype.substring(0, filetype.length() - 3);
 		int pointIndex = filetype.lastIndexOf('.');
 		if (pointIndex >= 0) filetype = filetype.substring(pointIndex + 1);
 		
@@ -213,18 +212,17 @@ public class FileRequestHandler implements HttpRequestHandler {
 		response.addHeader("Content-Type", contentType);
 		
 
-		try {	
-			if (isDeflated){
-				if (isDeflationPossible || file.length() > INFLATE_MAX_SIZE){
-					response.addHeader("Content-Encoding", "gzip");
-					response.setData(new FileInputStream(file));
-					return response;
-				} else {
-					response.setData(new GZIPInputStream(new FileInputStream(file)));
-					return response;
-				}
+		try {
+			if (usedCompressionType == CompressionType.GZIP){
+				response.addHeader("Content-Encoding", "gzip");
+				response.setData(new FileInputStream(file));
+				return response;
+			} else if (usedCompressionType == CompressionType.BROTLI){
+				response.addHeader("Content-Encoding", "br");
+				response.setData(new FileInputStream(file));
+				return response;
 			} else {
-				if (isDeflationPossible && file.length() > DEFLATE_MIN_SIZE && file.length() < DEFLATE_MAX_SIZE){
+				if (file.length() > DEFLATE_MIN_SIZE && file.length() < DEFLATE_MAX_SIZE){
 					FileInputStream fis = new FileInputStream(file);
 					ByteArrayOutputStream byteOut = new ByteArrayOutputStream();
 					GZIPOutputStream zos = new GZIPOutputStream(byteOut);
