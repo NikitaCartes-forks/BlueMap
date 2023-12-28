@@ -65,11 +65,11 @@ dependencies {
     api ("org.apache.commons:commons-dbcp2:2.9.0")
     api ("io.airlift:aircompressor:0.24")
 
-    api (group = "com.aayushatharva.brotli4j", name = "brotli4j", version = "1.4.2")
-    api (group = "com.aayushatharva.brotli4j", name = "native-windows-x86_64", version = "1.4.2")
-    api (group = "com.aayushatharva.brotli4j", name = "native-linux-aarch64", version = "1.4.2")
-    api (group = "com.aayushatharva.brotli4j", name = "native-osx-x86_64", version = "1.4.2")
-    api (group = "com.aayushatharva.brotli4j", name = "native-linux-x86_64", version = "1.4.2")
+    api (group = "com.aayushatharva.brotli4j", name = "brotli4j", version = "1.14.0")
+    api (group = "com.aayushatharva.brotli4j", name = "native-windows-x86_64", version = "1.14.0")
+    api (group = "com.aayushatharva.brotli4j", name = "native-linux-aarch64", version = "1.14.0")
+    api (group = "com.aayushatharva.brotli4j", name = "native-osx-x86_64", version = "1.14.0")
+    api (group = "com.aayushatharva.brotli4j", name = "native-linux-x86_64", version = "1.14.0")
 
     api ("de.bluecolored.bluemap.api:BlueMapAPI")
 
