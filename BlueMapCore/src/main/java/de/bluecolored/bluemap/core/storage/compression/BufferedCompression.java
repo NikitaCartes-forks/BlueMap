@@ -24,6 +24,7 @@
  */
 package de.bluecolored.bluemap.core.storage.compression;
 
+import com.aayushatharva.brotli4j.Brotli4jLoader;
 import de.bluecolored.bluemap.core.util.Key;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -52,6 +53,10 @@ public class BufferedCompression implements Compression {
     @FunctionalInterface
     public interface StreamTransformer<T> {
         T apply(T original) throws IOException;
+    }
+
+    static {
+        Brotli4jLoader.ensureAvailability();
     }
 
 }

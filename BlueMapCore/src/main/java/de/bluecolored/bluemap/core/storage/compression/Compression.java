@@ -31,6 +31,9 @@ import io.airlift.compress.zstd.ZstdInputStream;
 import io.airlift.compress.zstd.ZstdOutputStream;
 import net.jpountz.lz4.LZ4FrameInputStream;
 import net.jpountz.lz4.LZ4FrameOutputStream;
+import com.aayushatharva.brotli4j.decoder.BrotliInputStream;
+import com.aayushatharva.brotli4j.encoder.BrotliOutputStream;
+import com.aayushatharva.brotli4j.encoder.Encoder;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -47,13 +50,15 @@ public interface Compression extends Keyed {
     Compression DEFLATE = new BufferedCompression(Key.bluemap("deflate"), "deflate", ".deflate", DeflaterOutputStream::new, InflaterInputStream::new);
     Compression ZSTD = new BufferedCompression(Key.bluemap("zstd"), "zstd", ".zst", ZstdOutputStream::new, ZstdInputStream::new);
     Compression LZ4 = new BufferedCompression(Key.bluemap("lz4"), "lz4", ".lz4", LZ4FrameOutputStream::new, LZ4FrameInputStream::new);
+    Compression BROTLI = new BufferedCompression(Key.bluemap("br"), "br", ".br", in -> new BrotliOutputStream(in, new Encoder.Parameters().setQuality(5)), BrotliInputStream::new);
 
     Registry<Compression> REGISTRY = new Registry<>(
             NONE,
             GZIP,
             DEFLATE,
             ZSTD,
-            LZ4
+            LZ4,
+            BROTLI
     );
 
     String getId();
