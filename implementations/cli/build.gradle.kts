@@ -24,6 +24,13 @@ repositories {
 dependencies {
 	api ("de.bluecolored.bluemap:BlueMapCommon")
 
+	api (group = "com.aayushatharva.brotli4j", name = "native-windows-x86_64", version = "1.16.0")
+	api (group = "com.aayushatharva.brotli4j", name = "native-windows-aarch64", version = "1.16.0")
+	api (group = "com.aayushatharva.brotli4j", name = "native-linux-x86_64", version = "1.16.0")
+	api (group = "com.aayushatharva.brotli4j", name = "native-linux-aarch64", version = "1.16.0")
+	api (group = "com.aayushatharva.brotli4j", name = "native-osx-x86_64", version = "1.16.0")
+	api (group = "com.aayushatharva.brotli4j", name = "native-osx-aarch64", version = "1.16.0")
+
 	@Suppress("GradlePackageUpdate")
 	implementation ("commons-cli:commons-cli:1.5.0")
 

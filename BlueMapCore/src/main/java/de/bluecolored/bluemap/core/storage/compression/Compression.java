@@ -50,7 +50,7 @@ public interface Compression extends Keyed {
     Compression DEFLATE = new BufferedCompression(Key.bluemap("deflate"), "deflate", ".deflate", DeflaterOutputStream::new, InflaterInputStream::new);
     Compression ZSTD = new BufferedCompression(Key.bluemap("zstd"), "zstd", ".zst", ZstdOutputStream::new, ZstdInputStream::new);
     Compression LZ4 = new BufferedCompression(Key.bluemap("lz4"), "lz4", ".lz4", LZ4FrameOutputStream::new, LZ4FrameInputStream::new);
-    Compression BROTLI = new BufferedCompression(Key.bluemap("br"), "br", ".br", in -> new BrotliOutputStream(in, new Encoder.Parameters().setQuality(5)), BrotliInputStream::new);
+    Compression BROTLI = new BufferedCompression(Key.bluemap("brotli"), "br", ".br", in -> new BrotliOutputStream(in, new Encoder.Parameters().setQuality(5)), BrotliInputStream::new);
 
     Registry<Compression> REGISTRY = new Registry<>(
             NONE,
