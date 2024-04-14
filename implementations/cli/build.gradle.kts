@@ -6,10 +6,10 @@ plugins {
 	id ("com.github.johnrengelman.shadow") version "7.1.2"
 }
 
-group = "de.bluecolored.bluemap.cli"
+group = "de.bluecolored.bluemap"
 version = System.getProperty("bluemap.version") ?: "?" // set by BlueMapCore
 
-val javaTarget = 11
+val javaTarget = 16
 java {
 	sourceCompatibility = JavaVersion.toVersion(javaTarget)
 	targetCompatibility = JavaVersion.toVersion(javaTarget)
@@ -17,16 +17,12 @@ java {
 
 repositories {
 	mavenCentral()
-	maven {
-		setUrl("https://libraries.minecraft.net")
-	}
-	maven {
-		setUrl("https://jitpack.io")
-	}
+	maven ("https://libraries.minecraft.net")
+	maven ("https://repo.bluecolored.de/releases")
 }
 
 dependencies {
-	api ("de.bluecolored.bluemap.common:BlueMapCommon")
+	api ("de.bluecolored.bluemap:BlueMapCommon")
 
 	@Suppress("GradlePackageUpdate")
 	implementation ("commons-cli:commons-cli:1.5.0")
@@ -76,7 +72,7 @@ tasks.shadowJar {
 	//relocate ("com.flowpowered.math", "de.bluecolored.shadow.flowpowered.math") //DON"T relocate this, because the API depends on it
 	relocate ("com.google", "de.bluecolored.shadow.google")
 	relocate ("com.typesafe", "de.bluecolored.shadow.typesafe")
-	relocate ("net.querz.nbt", "de.bluecolored.shadow.querz.nbt")
+	relocate ("de.bluecolored.bluenbt", "de.bluecolored.shadow.bluenbt")
 	relocate ("org.spongepowered.configurate", "de.bluecolored.shadow.configurate")
 	relocate ("com.github.benmanes.caffeine", "de.bluecolored.shadow.benmanes.caffeine")
 	relocate ("org.aopalliance", "de.bluecolored.shadow.aopalliance")
@@ -88,6 +84,7 @@ tasks.shadowJar {
 	relocate ("io.leangen.geantyref", "de.bluecolored.shadow.geantyref")
 	relocate ("io.airlift", "de.bluecolored.shadow.airlift")
 	relocate ("org.apache.commons", "de.bluecolored.shadow.apache.commons")
+	relocate ("net.jpountz", "de.bluecolored.shadow.jpountz")
 }
 
 tasks.register("release") {

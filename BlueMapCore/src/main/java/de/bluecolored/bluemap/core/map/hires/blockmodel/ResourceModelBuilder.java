@@ -30,7 +30,7 @@ import com.flowpowered.math.vector.Vector3i;
 import com.flowpowered.math.vector.Vector4f;
 import de.bluecolored.bluemap.core.map.TextureGallery;
 import de.bluecolored.bluemap.core.map.hires.BlockModelView;
-import de.bluecolored.bluemap.core.map.hires.HiresTileModel;
+import de.bluecolored.bluemap.core.map.hires.TileModel;
 import de.bluecolored.bluemap.core.map.hires.RenderSettings;
 import de.bluecolored.bluemap.core.resources.BlockColorCalculatorFactory;
 import de.bluecolored.bluemap.core.resources.ResourcePath;
@@ -45,10 +45,10 @@ import de.bluecolored.bluemap.core.util.math.Color;
 import de.bluecolored.bluemap.core.util.math.MatrixM4f;
 import de.bluecolored.bluemap.core.util.math.VectorM2f;
 import de.bluecolored.bluemap.core.util.math.VectorM3f;
-import de.bluecolored.bluemap.core.world.BlockNeighborhood;
 import de.bluecolored.bluemap.core.world.BlockProperties;
-import de.bluecolored.bluemap.core.world.ExtendedBlock;
 import de.bluecolored.bluemap.core.world.LightData;
+import de.bluecolored.bluemap.core.world.block.BlockNeighborhood;
+import de.bluecolored.bluemap.core.world.block.ExtendedBlock;
 
 /**
  * This model builder creates a BlockStateModel using the information from parsed resource-pack json files.
@@ -74,7 +74,6 @@ public class ResourceModelBuilder {
     private BlockModelView blockModel;
     private Color blockColor;
     private float blockColorOpacity;
-    private boolean isCave;
 
     public ResourceModelBuilder(ResourcePack resourcePack, TextureGallery textureGallery, RenderSettings renderSettings) {
         this.resourcePack = resourcePack;
@@ -94,10 +93,6 @@ public class ResourceModelBuilder {
         this.blockColorOpacity = 0f;
         this.variant = variant;
         this.modelResource = variant.getModel().getResource();
-
-        this.isCave =
-                this.block.getY() < renderSettings.getRemoveCavesBelowY() &&
-                this.block.getY() < block.getChunk().getOceanFloorY(block.getX(), block.getZ()) + renderSettings.getCaveDetectionOceanFloor();
 
         this.tintColor.set(0, 0, 0, -1, true);
 
@@ -184,14 +179,6 @@ public class ResourceModelBuilder {
 
         Vector3i faceDirVector = faceDir.toVector();
 
-        // face culling
-        if (face.getCullface() != null) {
-            ExtendedBlock<?> b = getRotationRelativeBlock(face.getCullface());
-            BlockProperties p = b.getProperties();
-            if (p.isCulling()) return;
-            if (p.getCullingIdentical() && b.getBlockState().equals(block.getBlockState())) return;
-        }
-
         // light calculation
         ExtendedBlock<?> facedBlockNeighbor = getRotationRelativeBlock(faceDir);
         LightData blockLightData = block.getLightData();
@@ -201,13 +188,34 @@ public class ResourceModelBuilder {
         int blockLight = Math.max(blockLightData.getBlockLight(), facedLightData.getBlockLight());
 
         // filter out faces that are in a "cave" that should not be rendered
-        if (isCave && (renderSettings.isCaveDetectionUsesBlockLight() ? Math.max(blockLight, sunLight) : sunLight) == 0f) return;
+        if (
+                block.isRemoveIfCave() &&
+                (renderSettings.isCaveDetectionUsesBlockLight() ? Math.max(blockLight, sunLight) : sunLight) == 0
+        ) return;
+
+        // calculate faceRotationVector
+        faceRotationVector.set(
+                faceDirVector.getX(),
+                faceDirVector.getY(),
+                faceDirVector.getZ()
+        );
+        faceRotationVector.rotateAndScale(element.getRotation().getMatrix());
+        makeRotationRelative(faceRotationVector);
+
+        // face culling
+        //if (faceRotationVector.y < 0.01) return;
+        if (face.getCullface() != null) {
+            ExtendedBlock<?> b = getRotationRelativeBlock(face.getCullface());
+            BlockProperties p = b.getProperties();
+            if (p.isCulling()) return;
+            if (p.getCullingIdentical() && b.getBlockState().equals(block.getBlockState())) return;
+        }
 
         // initialize the faces
         blockModel.initialize();
         blockModel.add(2);
 
-        HiresTileModel tileModel = blockModel.getHiresTile();
+        TileModel tileModel = blockModel.getHiresTile();
         int face1 = blockModel.getStart();
         int face2 = face1 + 1;
 
@@ -261,7 +269,7 @@ public class ResourceModelBuilder {
 
         // rotate uv's
         if (uvRotation != 0){
-            uvRotation *= TrigMath.DEG_TO_RAD;
+            uvRotation = (float)(uvRotation * TrigMath.DEG_TO_RAD);
             float cx = TrigMath.cos(uvRotation), cy = TrigMath.sin(uvRotation);
             for (VectorM2f uv : uvs) {
                 uv.translate(-0.5f, -0.5f);
@@ -317,14 +325,6 @@ public class ResourceModelBuilder {
         tileModel.setAOs(face2, ao0, ao2, ao3);
 
         //if is top face set model-color
-        faceRotationVector.set(
-                faceDirVector.getX(),
-                faceDirVector.getY(),
-                faceDirVector.getZ()
-        );
-        faceRotationVector.rotateAndScale(element.getRotation().getMatrix());
-        makeRotationRelative(faceRotationVector);
-
         float a = faceRotationVector.y;
         if (a > 0.01 && texturePath != null) {
             Texture texture = texturePath.getResource(resourcePack::getTexture);

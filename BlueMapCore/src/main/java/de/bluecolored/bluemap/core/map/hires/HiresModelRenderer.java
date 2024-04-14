@@ -30,7 +30,8 @@ import de.bluecolored.bluemap.core.map.TileMetaConsumer;
 import de.bluecolored.bluemap.core.map.hires.blockmodel.BlockStateModelFactory;
 import de.bluecolored.bluemap.core.resources.resourcepack.ResourcePack;
 import de.bluecolored.bluemap.core.util.math.Color;
-import de.bluecolored.bluemap.core.world.BlockNeighborhood;
+import de.bluecolored.bluemap.core.world.Chunk;
+import de.bluecolored.bluemap.core.world.block.BlockNeighborhood;
 import de.bluecolored.bluemap.core.world.World;
 
 public class HiresModelRenderer {
@@ -45,11 +46,11 @@ public class HiresModelRenderer {
         this.renderSettings = renderSettings;
     }
 
-    public void render(World world, Vector3i modelMin, Vector3i modelMax, HiresTileModel model) {
+    public void render(World world, Vector3i modelMin, Vector3i modelMax, TileModel model) {
         render(world, modelMin, modelMax, model, (x, z, c, h, l) -> {});
     }
 
-    public void render(World world, Vector3i modelMin, Vector3i modelMax, HiresTileModel model, TileMetaConsumer tileMetaConsumer) {
+    public void render(World world, Vector3i modelMin, Vector3i modelMax, TileModel model, TileMetaConsumer tileMetaConsumer) {
         Vector3i min = modelMin.max(renderSettings.getMinPos());
         Vector3i max = modelMax.min(renderSettings.getMaxPos());
         Vector3i modelAnchor = new Vector3i(modelMin.getX(), 0, modelMin.getZ());
@@ -68,15 +69,16 @@ public class HiresModelRenderer {
             for (z = min.getZ(); z <= max.getZ(); z++){
 
                 maxHeight = 0;
-                topBlockLight = 0f;
+                topBlockLight = 0;
 
                 columnColor.set(0, 0, 0, 0, true);
 
                 if (renderSettings.isInsideRenderBoundaries(x, z)) {
-                    minY = Math.max(min.getY(), world.getMinY(x, z));
-                    maxY = Math.min(max.getY(), world.getMaxY(x, z));
+                    Chunk chunk = world.getChunkAtBlock(x, z);
+                    minY = Math.max(min.getY(), chunk.getMinY(x, z));
+                    maxY = Math.min(max.getY(), chunk.getMaxY(x, z));
 
-                    for (y = minY; y <= maxY; y++) {
+                    for (y = maxY; y >= minY; y--) {
                         block.set(x, y, z);
                         if (!block.isInsideRenderBounds()) continue;
 
@@ -85,17 +87,7 @@ public class HiresModelRenderer {
                         modelFactory.render(block, blockModel, blockColor);
 
                         //update topBlockLight
-                        if (
-                                y >= renderSettings.getRemoveCavesBelowY() ||
-                                (renderSettings.isCaveDetectionUsesBlockLight() ? block.getBlockLightLevel() : block.getSunLightLevel()) > 0
-                        ) {
-                            if (blockColor.a > 0) {
-                                topBlockLight = Math.floor(topBlockLight * (1 - blockColor.a));
-                            }
-                            topBlockLight = Math.max(topBlockLight, block.getBlockLightLevel());
-                        } else {
-                            topBlockLight = 0;
-                        }
+                        topBlockLight = Math.max(topBlockLight, block.getBlockLightLevel() * (1 - columnColor.a));
 
                         // skip empty blocks
                         if (blockModel.getSize() <= 0) continue;
@@ -105,9 +97,11 @@ public class HiresModelRenderer {
 
                         //update color and height (only if not 100% translucent)
                         if (blockColor.a > 0) {
-                            maxHeight = y;
-                            columnColor.overlay(blockColor.premultiplied());
+                            if (maxHeight < y) maxHeight = y;
+                            columnColor.underlay(blockColor.premultiplied());
                         }
+
+                        //if (blockColor.a > 0.999 && block.getProperties().isCulling()) break;
                     }
                 }
 

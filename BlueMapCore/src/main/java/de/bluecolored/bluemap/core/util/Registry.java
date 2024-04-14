@@ -1,0 +1,84 @@
+/*
+ * This file is part of BlueMap, licensed under the MIT License (MIT).
+ *
+ * Copyright (c) Blue (Lukas Rieger) <https://bluecolored.de>
+ * Copyright (c) contributors
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+package de.bluecolored.bluemap.core.util;
+
+import org.jetbrains.annotations.Nullable;
+
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+
+public class Registry<T extends Keyed> {
+
+    private final ConcurrentHashMap<Key, T> entries;
+
+    public Registry() {
+        this.entries = new ConcurrentHashMap<>();
+    }
+
+    @SafeVarargs
+    public Registry(T... defaultEntires) {
+        this();
+        for (T entry : defaultEntires)
+            register(entry);
+    }
+
+    /**
+     * Registers a new entry, only if there is no entry with the same key registered already.
+     * Does nothing otherwise.
+     * @param entry The new entry to be added to this registry
+     * @return true if the entry has been added, false if there is already an entry with the same key registered
+     */
+    public boolean register(T entry) {
+        Objects.requireNonNull(entry, "registry entry can not be null");
+        return entries.putIfAbsent(entry.getKey(), entry) != null;
+    }
+
+    /**
+     * Gets an entry from this registry for a key.
+     * @param key The key to search for
+     * @return The entry with the key, or null if there is no entry for this key
+     */
+    public @Nullable T get(Key key) {
+        return entries.get(key);
+    }
+
+    /**
+     * Returns an unmodifiable set of all keys this registry contains entries for
+     */
+    public Set<Key> keys() {
+        return Collections.unmodifiableSet(entries.keySet());
+    }
+
+    /**
+     * Returns an unmodifiable collection of entries in this registry
+     */
+    public Collection<T> values() {
+        return Collections.unmodifiableCollection(entries.values());
+    }
+
+}

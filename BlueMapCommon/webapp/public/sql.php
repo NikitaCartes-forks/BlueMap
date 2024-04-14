@@ -162,10 +162,12 @@ if (startsWith($path, "/maps/")) {
 
             // return result
             if ($line = $statement->fetch()) {
+                header("Cache-Control: public,max-age=86400");
+
                 if ($compression !== "none")
                     header("Content-Encoding: $compression");
                 if ($lod === 0) {
-                    header("Content-Type: application/json");
+                    header("Content-Type: application/octet-stream");
                 } else {
                     header("Content-Type: image/png");
                 }
@@ -175,9 +177,8 @@ if (startsWith($path, "/maps/")) {
 
         } catch (PDOException $e) { error(500, "Failed to fetch data"); }
 
-        // empty json response if nothing found
-        header("Content-Type: application/json");
-        echo "{}";
+        // no content if nothing found
+        http_response_code(204);
         exit;
     }
 
@@ -197,6 +198,7 @@ if (startsWith($path, "/maps/")) {
         $statement->execute();
 
         if ($line = $statement->fetch()) {
+            header("Cache-Control: public,max-age=86400");
             header("Content-Type: ".getMimeType($mapPath));
             send($line["value"]);
             exit;

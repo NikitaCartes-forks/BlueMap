@@ -25,12 +25,15 @@
 package de.bluecolored.bluemap.common.plugin;
 
 import com.flowpowered.math.vector.Vector2i;
+import de.bluecolored.bluemap.api.debug.DebugDump;
 import de.bluecolored.bluemap.common.rendermanager.RenderManager;
 import de.bluecolored.bluemap.common.rendermanager.WorldRegionRenderTask;
-import de.bluecolored.bluemap.api.debug.DebugDump;
 import de.bluecolored.bluemap.core.logger.Logger;
 import de.bluecolored.bluemap.core.map.BmMap;
 import de.bluecolored.bluemap.core.util.FileHelper;
+import de.bluecolored.bluemap.core.world.World;
+import de.bluecolored.bluemap.core.world.mca.MCAWorld;
+import de.bluecolored.bluemap.core.world.mca.region.RegionType;
 
 import java.io.IOException;
 import java.nio.file.*;
@@ -45,7 +48,6 @@ public class RegionFileWatchService extends Thread {
     private final RenderManager renderManager;
     private final WatchService watchService;
 
-    private boolean verbose;
     private volatile boolean closed;
 
     private Timer delayTimer;
@@ -53,24 +55,28 @@ public class RegionFileWatchService extends Thread {
     @DebugDump
     private final Map<Vector2i, TimerTask> scheduledUpdates;
 
-    public RegionFileWatchService(RenderManager renderManager, BmMap map, boolean verbose) throws IOException {
+    public RegionFileWatchService(RenderManager renderManager, BmMap map) throws IOException {
         this.renderManager = renderManager;
         this.map = map;
-        this.verbose = verbose;
         this.closed = false;
         this.scheduledUpdates = new HashMap<>();
 
-        Path folder = map.getWorld().getSaveFolder().resolve("region");
+        World world = map.getWorld();
+        if (!(world instanceof MCAWorld)) throw new UnsupportedOperationException("world-type is not supported");
+        Path folder = ((MCAWorld) world).getRegionFolder();
         FileHelper.createDirectories(folder);
 
         this.watchService = folder.getFileSystem().newWatchService();
-
         folder.register(this.watchService, StandardWatchEventKinds.ENTRY_CREATE, StandardWatchEventKinds.ENTRY_MODIFY);
+
+        Logger.global.logDebug("Created region-file watch-service for map '" + map.getId() + "' at '" + folder + "'.");
     }
 
     @Override
     public void run() {
         if (delayTimer == null) delayTimer = new Timer("BlueMap-RegionFileWatchService-DelayTimer", true);
+
+        Logger.global.logDebug("Started watching map '" + map.getId() + "' for updates...");
 
         try {
             while (!closed) {
@@ -91,20 +97,20 @@ public class RegionFileWatchService extends Thread {
 
                 if (!key.reset()) return;
             }
-        } catch ( ClosedWatchServiceException ignore) {
+        } catch (ClosedWatchServiceException ignore) {
         } catch (InterruptedException iex) {
             Thread.currentThread().interrupt();
-        }
-
-        if (!closed) {
-            Logger.global.logWarning("Region-file watch-service for map '" + map.getId() +
-                                     "' stopped unexpectedly! (This map might not update automatically from now on)");
+        } finally {
+            Logger.global.logDebug("Stopped watching map '" + map.getId() + "' for updates.");
+            if (!closed) {
+                Logger.global.logWarning("Region-file watch-service for map '" + map.getId() +
+                        "' stopped unexpectedly! (This map might not update automatically from now on)");
+            }
         }
     }
 
     private synchronized void updateRegion(String regionFileName) {
-        if (!regionFileName.endsWith(".mca")) return;
-        if (!regionFileName.startsWith("r.")) return;
+        if (RegionType.forFileName(regionFileName) == null) return;
 
         try {
             String[] filenameParts = regionFileName.split("\\.");
@@ -114,7 +120,7 @@ public class RegionFileWatchService extends Thread {
             int rZ = Integer.parseInt(filenameParts[2]);
             Vector2i regionPos = new Vector2i(rX, rZ);
 
-            // we only want to start the render when there were no changes on a file for 10 seconds
+            // we only want to start the render when there were no changes on a file for 5 seconds
             TimerTask task = scheduledUpdates.remove(regionPos);
             if (task != null) task.cancel();
 
@@ -126,12 +132,12 @@ public class RegionFileWatchService extends Thread {
                         scheduledUpdates.remove(regionPos);
                         renderManager.scheduleRenderTask(task);
 
-                        if (verbose) Logger.global.logInfo("Scheduled update for region-file: " + regionPos + " (Map: " + map.getId() + ")");
+                        Logger.global.logDebug("Scheduled update for region-file: " + regionPos + " (Map: " + map.getId() + ")");
                     }
                 }
             };
             scheduledUpdates.put(regionPos, task);
-            delayTimer.schedule(task, 10000);
+            delayTimer.schedule(task, 5000);
         } catch (NumberFormatException ignore) {}
     }
 

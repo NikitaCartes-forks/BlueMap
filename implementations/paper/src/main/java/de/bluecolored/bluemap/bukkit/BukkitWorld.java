@@ -24,80 +24,91 @@
  */
 package de.bluecolored.bluemap.bukkit;
 
-import de.bluecolored.bluemap.common.serverinterface.Dimension;
 import de.bluecolored.bluemap.common.serverinterface.ServerWorld;
+import de.bluecolored.bluemap.core.resources.datapack.DataPack;
+import de.bluecolored.bluemap.core.util.Key;
+import de.bluecolored.bluemap.core.world.mca.MCAWorld;
+import org.bukkit.Bukkit;
 import org.bukkit.World;
 
 import java.lang.ref.WeakReference;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 
 public class BukkitWorld implements ServerWorld {
 
     private final WeakReference<World> delegate;
-    private final Path saveFolder;
+    private final Path worldFolder;
+    private final Key dimension;
 
     public BukkitWorld(World delegate) {
         this.delegate = new WeakReference<>(delegate);
-        Dimension dimension = getDimension();
-        Path saveFolder = delegate.getWorldFolder().toPath()
-                .resolve(dimension.getDimensionSubPath())
-                .toAbsolutePath().normalize();
+        Path worldFolder = delegate.getWorldFolder().toPath();
+
+        this.dimension = switch (delegate.getEnvironment()) {
+            case NORMAL -> DataPack.DIMENSION_OVERWORLD;
+            case NETHER -> DataPack.DIMENSION_THE_NETHER;
+            case THE_END -> DataPack.DIMENSION_THE_END;
+            case CUSTOM -> {
+                var id = delegate.key();
+                yield new Key(id.namespace(), id.value());
+            }
+        };
 
         // fix for hybrids
-        if (!Files.exists(saveFolder)) {
-            Path direct = delegate.getWorldFolder().toPath();
-            if (Files.exists(direct) && direct.endsWith(dimension.getDimensionSubPath()))
-                saveFolder = direct;
+        Path dimensionFolder = MCAWorld.resolveDimensionFolder(worldFolder, dimension);
+        if (!Files.exists(dimensionFolder)) {
+            Path dimensionSubPath = worldFolder.relativize(dimensionFolder);
+
+            if (Files.exists(worldFolder) && worldFolder.endsWith(dimensionSubPath))
+                worldFolder = worldFolder.subpath(0, worldFolder.getNameCount() - dimensionSubPath.getNameCount());
         }
 
-        this.saveFolder = saveFolder;
-    }
-
-    @Override
-    public Dimension getDimension() {
-        World world = delegate.get();
-        if (world != null) {
-            if (world.getEnvironment().equals(World.Environment.NETHER)) return Dimension.NETHER;
-            if (world.getEnvironment().equals(World.Environment.THE_END)) return Dimension.END;
-        }
-        return Dimension.OVERWORLD;
-    }
-
-    @Override
-    public Optional<String> getId() {
-        World world = delegate.get();
-        if (world != null) {
-            return Optional.of(world.getUID().toString());
-        }
-        return Optional.empty();
-    }
-
-    @Override
-    public Optional<String> getName() {
-        World world = delegate.get();
-        if (world != null) {
-            return Optional.of(world.getName());
-        }
-        return Optional.empty();
+        this.worldFolder = worldFolder;
     }
 
     @Override
     public boolean persistWorldChanges() {
-        /* Not supported by folia
-        World world = delegate.get();
-        if (world != null) {
-            world.save();
-            return true;
+        if (!FoliaSupport.IS_FOLIA) {
+            World world = delegate.get();
+            if (world != null) {
+                Executor mainThread = Bukkit.getScheduler().getMainThreadExecutor(BukkitPlugin.getInstance());
+                CompletableFuture
+                        .runAsync(world::save, mainThread)
+                        .join();
+                return true;
+            }
         }
-        */
+
         return false;
     }
 
     @Override
-    public Path getSaveFolder() {
-        return this.saveFolder;
+    public Path getWorldFolder() {
+        return worldFolder;
+    }
+
+    @Override
+    public Key getDimension() {
+        return dimension;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        BukkitWorld that = (BukkitWorld) o;
+        Object world = delegate.get();
+        return world != null && world.equals(that.delegate.get());
+    }
+
+    @Override
+    public int hashCode() {
+        Object world = delegate.get();
+        return world != null ? world.hashCode() : 0;
     }
 
 }

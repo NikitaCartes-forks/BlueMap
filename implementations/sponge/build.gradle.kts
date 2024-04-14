@@ -11,7 +11,7 @@ plugins {
 	id("org.spongepowered.gradle.ore") version "2.2.0"
 }
 
-group = "de.bluecolored.bluemap.bukkit"
+group = "de.bluecolored.bluemap"
 version = System.getProperty("bluemap.version") ?: "?" // set by BlueMapCore
 
 val javaTarget = 16
@@ -22,16 +22,12 @@ java {
 
 repositories {
 	mavenCentral()
-	maven {
-		setUrl("https://libraries.minecraft.net")
-	}
-	maven {
-		setUrl("https://jitpack.io")
-	}
+	maven ("https://libraries.minecraft.net")
+	maven ("https://repo.bluecolored.de/releases")
 }
 
 dependencies {
-	api ("de.bluecolored.bluemap.common:BlueMapCommon"){
+	api ("de.bluecolored.bluemap:BlueMapCommon"){
 		//exclude dependencies provided by sponge
 		exclude( group = "com.google.guava", module = "guava" )
 		exclude( group = "com.google.code.gson", module = "gson" )
@@ -108,7 +104,7 @@ tasks.shadowJar {
 	archiveFileName.set("BlueMap-${project.version}-${project.name}.jar")
 
 	//relocate ("com.flowpowered.math", "de.bluecolored.shadow.flowpowered.math") //DON"T relocate this, because the API depends on it
-	relocate ("net.querz.nbt", "de.bluecolored.shadow.querz.nbt")
+	relocate ("de.bluecolored.bluenbt", "de.bluecolored.shadow.bluenbt")
 	relocate ("com.mojang.brigadier", "de.bluecolored.shadow.mojang.brigadier")
 	relocate ("com.github.benmanes.caffeine", "de.bluecolored.shadow.benmanes.caffeine")
 	relocate ("com.google.errorprone", "de.bluecolored.shadow.google.errorprone")
@@ -120,6 +116,7 @@ tasks.shadowJar {
 	relocate ("org.codehaus", "de.bluecolored.shadow.codehaus")
 	relocate ("io.leangen.geantyref", "de.bluecolored.shadow.geantyref")
 	relocate ("io.airlift", "de.bluecolored.shadow.airlift")
+	relocate ("net.jpountz", "de.bluecolored.shadow.jpountz")
 
 	relocate ("org.apache.commons.dbcp2", "de.bluecolored.shadow.apache.commons.dbcp2")
 	relocate ("org.apache.commons.io", "de.bluecolored.shadow.apache.commons.io")

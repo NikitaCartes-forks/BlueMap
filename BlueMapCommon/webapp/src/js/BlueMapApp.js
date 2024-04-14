@@ -146,12 +146,16 @@ export class BlueMapApp {
             let styleElement = document.createElement("link");
             styleElement.rel = "stylesheet";
             styleElement.href = styleUrl;
+            alert(this.events, "Loading style: " + styleUrl, "fine");
             document.head.appendChild(styleElement);
         }
 
         // unload loaded maps
         await this.mapViewer.switchMap(null);
         oldMaps.forEach(map => map.dispose());
+
+        // load user settings
+        await this.loadUserSettings();
 
         // load maps
         this.maps = await this.loadMaps();
@@ -179,9 +183,6 @@ export class BlueMapApp {
         if(this.updateLoop) clearTimeout(this.updateLoop);
         this.updateLoop = setTimeout(this.update, 1000);
 
-        // load user settings
-        await this.loadUserSettings();
-
         // save user settings
         this.saveUserSettings();
 
@@ -189,6 +190,7 @@ export class BlueMapApp {
         if (this.settings.scripts) for (let scriptUrl of this.settings.scripts) {
             let scriptElement = document.createElement("script");
             scriptElement.src = scriptUrl;
+            alert(this.events, "Loading script: " + scriptUrl, "fine");
             document.body.appendChild(scriptElement);
         }
     }
@@ -301,7 +303,7 @@ export class BlueMapApp {
                 let map = new BlueMapMap(mapId, this.dataUrl + mapId + "/", this.loadBlocker, this.mapViewer.events);
                 maps.push(map);
 
-                await map.loadSettings()
+                await map.loadSettings(this.mapViewer.tileCacheHash)
                     .catch(error => {
                         alert(this.events, `Failed to load settings for map '${map.data.id}':` + error, "warning");
                     });
@@ -724,6 +726,7 @@ export class BlueMapApp {
         controls.ortho = parseFloat(values[8]);
 
         this.updatePageAddress();
+        this.mapViewer.updateLoadedMapArea();
 
         return true;
     }

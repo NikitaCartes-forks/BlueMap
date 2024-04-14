@@ -26,6 +26,7 @@ package de.bluecolored.bluemap.common.api;
 
 import de.bluecolored.bluemap.api.WebApp;
 import de.bluecolored.bluemap.common.plugin.Plugin;
+import de.bluecolored.bluemap.core.logger.Logger;
 import de.bluecolored.bluemap.core.util.FileHelper;
 
 import javax.imageio.ImageIO;
@@ -49,7 +50,7 @@ public class WebAppImpl implements WebApp {
 
     @Override
     public Path getWebRoot() {
-        return plugin.getConfigs().getWebappConfig().getWebroot();
+        return plugin.getBlueMap().getConfig().getWebappConfig().getWebroot();
     }
 
     @Override
@@ -68,16 +69,19 @@ public class WebAppImpl implements WebApp {
 
     @Override
     public void registerScript(String url) {
+        Logger.global.logDebug("Registering script from API: " + url);
         plugin.getBlueMap().getWebFilesManager().getScripts().add(url);
     }
 
     @Override
     public void registerStyle(String url) {
+        Logger.global.logDebug("Registering style from API: " + url);
         plugin.getBlueMap().getWebFilesManager().getStyles().add(url);
     }
 
     @Override
     @Deprecated(forRemoval = true)
+    @SuppressWarnings("removal")
     public String createImage(BufferedImage image, String path) throws IOException {
         path = path.replaceAll("[^a-zA-Z0-9_.\\-/]", "_");
 
@@ -98,6 +102,8 @@ public class WebAppImpl implements WebApp {
     }
 
     @Override
+    @Deprecated(forRemoval = true)
+    @SuppressWarnings("removal")
     public Map<String, String> availableImages() throws IOException {
         Path webRoot = getWebRoot().toAbsolutePath();
         String separator = webRoot.getFileSystem().getSeparator();

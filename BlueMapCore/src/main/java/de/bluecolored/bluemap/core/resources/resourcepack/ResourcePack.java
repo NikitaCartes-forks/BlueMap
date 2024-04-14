@@ -39,6 +39,7 @@ import de.bluecolored.bluemap.core.resources.biome.BiomeConfig;
 import de.bluecolored.bluemap.core.resources.resourcepack.blockmodel.BlockModel;
 import de.bluecolored.bluemap.core.resources.resourcepack.blockmodel.TextureVariable;
 import de.bluecolored.bluemap.core.resources.resourcepack.blockstate.BlockState;
+import de.bluecolored.bluemap.core.resources.resourcepack.texture.AnimationMeta;
 import de.bluecolored.bluemap.core.resources.resourcepack.texture.Texture;
 import de.bluecolored.bluemap.core.util.Tristate;
 import de.bluecolored.bluemap.core.world.Biome;
@@ -50,6 +51,8 @@ import java.awt.image.BufferedImage;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.Reader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
@@ -183,19 +186,25 @@ public class ResourcePack {
         return props.build();
     }
 
-    public synchronized void loadResources(Iterable<Path> roots) throws IOException {
+    public synchronized void loadResources(Iterable<Path> roots) throws IOException, InterruptedException {
         Logger.global.logInfo("Loading resources...");
 
         for (Path root : roots) {
+            if (Thread.interrupted()) throw new InterruptedException();
+
             Logger.global.logDebug("Loading resources from: " + root + " ...");
             loadResourcePath(root, this::loadResources);
         }
 
         Logger.global.logInfo("Loading textures...");
         for (Path root : roots) {
+            if (Thread.interrupted()) throw new InterruptedException();
+
             Logger.global.logDebug("Loading textures from: " + root + " ...");
             loadResourcePath(root, this::loadTextures);
         }
+
+        if (Thread.interrupted()) throw new InterruptedException();
 
         Logger.global.logInfo("Baking resources...");
         bake();
@@ -204,7 +213,8 @@ public class ResourcePack {
         Logger.global.logInfo("Resources loaded.");
     }
 
-    private void loadResourcePath(Path root, PathLoader resourceLoader) throws IOException {
+    private void loadResourcePath(Path root, PathLoader resourceLoader) throws IOException, InterruptedException {
+        if (Thread.interrupted()) throw new InterruptedException();
         if (!Files.isDirectory(root)) {
             try (FileSystem fileSystem = FileSystems.newFileSystem(root, (ClassLoader) null)) {
                 for (Path fsRoot : fileSystem.getRootDirectories()) {
@@ -299,6 +309,7 @@ public class ResourcePack {
                     }, BlueMap.THREAD_POOL),
 
                     // load biome configs
+                    // TODO: move this to datapacks?
                     CompletableFuture.runAsync(() -> {
                         list(root.resolve("assets"))
                                 .map(path -> path.resolve("biomes.json"))
@@ -373,9 +384,23 @@ public class ResourcePack {
                         ResourcePath<Texture> resourcePath = new ResourcePath<>(root.relativize(file));
                         if (!usedTextures.contains(resourcePath)) return null; // don't load unused textures
 
+                        // load image
+                        BufferedImage image;
                         try (InputStream in = Files.newInputStream(file)) {
-                            return Texture.from(resourcePath, ImageIO.read(in), Files.exists(file.resolveSibling(file.getFileName() + ".mcmeta")));
+                            image = ImageIO.read(in);
                         }
+
+                        // load animation
+                        AnimationMeta animation = null;
+                        Path animationPathFile = file.resolveSibling(file.getFileName() + ".mcmeta");
+                        if (Files.exists(animationPathFile)) {
+                            try (Reader in = Files.newBufferedReader(animationPathFile, StandardCharsets.UTF_8)) {
+                                animation = ResourcesGson.INSTANCE.fromJson(in, AnimationMeta.class);
+                            }
+                        }
+
+                        return Texture.from(resourcePath, image, animation);
+
                     }, textures));
 
         } catch (RuntimeException ex) {
@@ -386,7 +411,7 @@ public class ResourcePack {
         }
     }
 
-    private void bake() throws IOException {
+    private void bake() throws IOException, InterruptedException {
 
         // fill path maps
         blockStates.keySet().forEach(path -> blockStatePaths.put(path.getFormatted(), path));
@@ -398,10 +423,14 @@ public class ResourcePack {
             model.optimize(this);
         }
 
+        if (Thread.interrupted()) throw new InterruptedException();
+
         // apply model parents
         for (BlockModel model : blockModels.values()) {
             model.applyParent(this);
         }
+
+        if (Thread.interrupted()) throw new InterruptedException();
 
         // calculate model properties
         for (BlockModel model : blockModels.values()) {

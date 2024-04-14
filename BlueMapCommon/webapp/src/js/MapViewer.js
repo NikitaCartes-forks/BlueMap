@@ -179,8 +179,8 @@ export class MapViewer {
 	handleMapInteraction(screenPosition, data = {}) {
 		let rootOffset = elementOffset(this.rootElement);
 		let normalizedScreenPos = new Vector2(
-			((screenPosition.x - rootOffset.top) / this.rootElement.clientWidth) * 2 - 1,
-			-((screenPosition.y - rootOffset.left) / this.rootElement.clientHeight) * 2 + 1
+			((screenPosition.x - rootOffset.left) / this.rootElement.clientWidth) * 2 - 1,
+			-((screenPosition.y - rootOffset.top) / this.rootElement.clientHeight) * 2 + 1
 		);
 
 		if (this.map && this.map.isLoaded){
@@ -294,7 +294,7 @@ export class MapViewer {
 		}
 
 		// render
-		if (delta >= 1000 || Date.now() - this.lastRedrawChange < 1000) {
+		if (delta >= 50 || Date.now() - this.lastRedrawChange < 1000) {
 			this.lastFrame = now;
 			this.render(delta);
 		}
@@ -324,6 +324,8 @@ export class MapViewer {
 		this.renderer.clearDepth();
 
 		if (this.map && this.map.isLoaded) {
+
+			this.map.animations.forEach(animation => animation.step(delta))
 
 			// shift whole scene including camera towards 0,0 to tackle shader-precision issues
 			const s = 10000;

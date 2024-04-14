@@ -39,6 +39,7 @@ import {TileManager} from "./TileManager";
 import {TileLoader} from "./TileLoader";
 import {LowresTileLoader} from "./LowresTileLoader";
 import {reactive} from "vue";
+import {TextureAnimation} from "@/js/map/TextureAnimation";
 
 export class Map {
 
@@ -86,6 +87,9 @@ export class Map {
 		/** @type {Texture[]} */
 		this.loadedTextures = [];
 
+		/** @type {TextureAnimation[]} */
+		this.animations = [];
+
 		/** @type {TileManager} */
 		this.hiresTileManager = null;
 		/** @type {TileManager[]} */
@@ -105,8 +109,8 @@ export class Map {
 	load(hiresVertexShader, hiresFragmentShader, lowresVertexShader, lowresFragmentShader, uniforms, tileCacheHash = 0) {
 		this.unload()
 
-		let settingsPromise = this.loadSettings();
-		let textureFilePromise = this.loadTexturesFile();
+		let settingsPromise = this.loadSettings(tileCacheHash);
+		let textureFilePromise = this.loadTexturesFile(tileCacheHash);
 
 		this.lowresMaterial = this.createLowresMaterial(lowresVertexShader, lowresFragmentShader, uniforms);
 
@@ -134,8 +138,8 @@ export class Map {
 	 * Loads the settings of this map
 	 * @returns {Promise<void>}
 	 */
-	loadSettings() {
-		return this.loadSettingsFile()
+	loadSettings(tileCacheHash) {
+		return this.loadSettingsFile(tileCacheHash)
 			.then(worldSettings => {
 				this.data.name = worldSettings.name ? worldSettings.name : this.data.name;
 
@@ -223,13 +227,13 @@ export class Map {
      * Loads the settings.json file for this map
      * @returns {Promise<Object>}
      */
-    loadSettingsFile() {
+    loadSettingsFile(tileCacheHash) {
         return new Promise((resolve, reject) => {
             alert(this.events, `Loading settings for map '${this.data.id}'...`, "fine");
 
             let loader = new FileLoader();
             loader.setResponseType("json");
-            loader.load(this.data.settingsUrl + "?" + generateCacheHash(),
+            loader.load(this.data.settingsUrl + "?" + tileCacheHash,
                 resolve,
                 () => {},
                 () => reject(`Failed to load the settings.json for map: ${this.data.id}`)
@@ -241,13 +245,13 @@ export class Map {
 	 * Loads the textures.json file for this map
 	 * @returns {Promise<Object>}
 	 */
-	loadTexturesFile() {
+	loadTexturesFile(tileCacheHash) {
 		return new Promise((resolve, reject) => {
 			alert(this.events, `Loading textures for map '${this.data.id}'...`, "fine");
 
 			let loader = new FileLoader();
 			loader.setResponseType("json");
-			loader.load(this.data.texturesUrl + "?" + generateCacheHash(),
+			loader.load(this.data.texturesUrl + "?" + tileCacheHash,
 				resolve,
 				() => {},
 				() => reject(`Failed to load the textures.json for map: ${this.data.id}`)
@@ -264,7 +268,8 @@ export class Map {
 	 *     resourcePath: string,
 	 *     color: number[],
 	 *     halfTransparent: boolean,
-	 *     texture: string
+	 *     texture: string,
+	 *     animation: any | undefined
 	 * }[]} the textures-data
 	 * @returns {ShaderMaterial[]} the hires Material (array because its a multi-material)
 	 */
@@ -293,7 +298,24 @@ export class Map {
 			texture.wrapT = ClampToEdgeWrapping;
 			texture.flipY = false;
 			texture.flatShading = true;
-			texture.image.addEventListener("load", () => texture.needsUpdate = true);
+
+			let animationUniforms = {
+				animationFrameHeight: { value: 1 },
+				animationFrameIndex: { value: 0 },
+				animationInterpolationFrameIndex: { value: 0 },
+				animationInterpolation: { value: 0 }
+			};
+
+			let animation = null;
+			if (textureSettings.animation) {
+				animation = new TextureAnimation(animationUniforms, textureSettings.animation);
+				this.animations.push(animation);
+			}
+
+			texture.image.addEventListener("load", () => {
+				texture.needsUpdate = true
+				if (animation) animation.init(texture.image.naturalWidth, texture.image.naturalHeight)
+			});
 
 			this.loadedTextures.push(texture);
 
@@ -304,7 +326,8 @@ export class Map {
 						type: 't',
 						value: texture
 					},
-					transparent: { value: transparent }
+					transparent: { value: transparent },
+					...animationUniforms
 				},
 				vertexShader: vertexShader,
 				fragmentShader: fragmentShader,
@@ -363,6 +386,8 @@ export class Map {
 
 		this.loadedTextures.forEach(texture => texture.dispose());
 		this.loadedTextures = [];
+
+		this.animations = [];
 	}
 
 	/**

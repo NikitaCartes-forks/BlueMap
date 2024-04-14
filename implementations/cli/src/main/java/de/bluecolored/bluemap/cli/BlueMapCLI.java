@@ -24,10 +24,10 @@
  */
 package de.bluecolored.bluemap.cli;
 
-import de.bluecolored.bluemap.common.BlueMapConfigProvider;
+import de.bluecolored.bluemap.common.BlueMapConfiguration;
 import de.bluecolored.bluemap.common.BlueMapService;
 import de.bluecolored.bluemap.common.MissingResourcesException;
-import de.bluecolored.bluemap.common.config.BlueMapConfigs;
+import de.bluecolored.bluemap.common.config.BlueMapConfigManager;
 import de.bluecolored.bluemap.common.config.ConfigurationException;
 import de.bluecolored.bluemap.common.config.CoreConfig;
 import de.bluecolored.bluemap.common.config.WebserverConfig;
@@ -35,10 +35,6 @@ import de.bluecolored.bluemap.common.plugin.RegionFileWatchService;
 import de.bluecolored.bluemap.common.rendermanager.MapUpdateTask;
 import de.bluecolored.bluemap.common.rendermanager.RenderManager;
 import de.bluecolored.bluemap.common.rendermanager.RenderTask;
-import de.bluecolored.bluemap.common.serverinterface.Player;
-import de.bluecolored.bluemap.common.serverinterface.ServerEventListener;
-import de.bluecolored.bluemap.common.serverinterface.ServerInterface;
-import de.bluecolored.bluemap.common.serverinterface.ServerWorld;
 import de.bluecolored.bluemap.common.web.*;
 import de.bluecolored.bluemap.common.web.http.HttpRequestHandler;
 import de.bluecolored.bluemap.common.web.http.HttpServer;
@@ -47,10 +43,11 @@ import de.bluecolored.bluemap.core.MinecraftVersion;
 import de.bluecolored.bluemap.core.logger.Logger;
 import de.bluecolored.bluemap.core.map.BmMap;
 import de.bluecolored.bluemap.core.metrics.Metrics;
-import de.bluecolored.bluemap.core.storage.Storage;
+import de.bluecolored.bluemap.core.storage.MapStorage;
 import de.bluecolored.bluemap.core.util.FileHelper;
 import org.apache.commons.cli.*;
 import org.apache.commons.lang3.time.DurationFormatUtils;
+import org.checkerframework.checker.nullness.qual.Nullable;
 
 import java.io.File;
 import java.io.IOException;
@@ -63,36 +60,46 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
-public class BlueMapCLI implements ServerInterface {
+public class BlueMapCLI {
 
     private MinecraftVersion minecraftVersion = MinecraftVersion.LATEST_SUPPORTED;
-    private Path configFolder;
+    private Path configFolder = Path.of("config");
 
-    public void renderMaps(BlueMapService blueMap, boolean watch, boolean forceRender, boolean forceGenerateWebapp) throws ConfigurationException, IOException, InterruptedException {
+    public void renderMaps(BlueMapService blueMap, boolean watch, boolean forceRender, boolean forceGenerateWebapp,
+                           @Nullable String mapsToRender) throws ConfigurationException, IOException, InterruptedException {
 
         //metrics report
-        if (blueMap.getConfigs().getCoreConfig().isMetrics()) Metrics.sendReportAsync("cli");
+        if (blueMap.getConfig().getCoreConfig().isMetrics()) Metrics.sendReportAsync(
+                "cli",
+                blueMap.getConfig().getMinecraftVersion().getVersionString()
+        );
 
-        if (blueMap.getConfigs().getWebappConfig().isEnabled())
+        if (blueMap.getConfig().getWebappConfig().isEnabled())
             blueMap.createOrUpdateWebApp(forceGenerateWebapp);
 
         //try load resources
-        blueMap.getResourcePack();
+        blueMap.getOrLoadResourcePack();
 
         //create renderManager
         RenderManager renderManager = new RenderManager();
 
         //load maps
-        Map<String, BmMap> maps = blueMap.getMaps();
+        Predicate<String> mapFilter = mapId -> true;
+        if (mapsToRender != null) {
+            Set<String> mapsToRenderSet = Set.of(mapsToRender.split(","));
+            mapFilter = mapsToRenderSet::contains;
+        }
+        Map<String, BmMap> maps = blueMap.getOrLoadMaps(mapFilter);
 
         //watcher
         List<RegionFileWatchService> regionFileWatchServices = new ArrayList<>();
         if (watch) {
             for (BmMap map : maps.values()) {
                 try {
-                    RegionFileWatchService watcher = new RegionFileWatchService(renderManager, map, true);
+                    RegionFileWatchService watcher = new RegionFileWatchService(renderManager, map);
                     watcher.start();
                     regionFileWatchServices.add(watcher);
                 } catch (IOException ex) {
@@ -113,7 +120,7 @@ public class BlueMapCLI implements ServerInterface {
         Logger.global.logInfo("Start updating " + maps.size() + " maps (" + totalRegions + " regions, ~" + totalRegions * 1024L + " chunks)...");
 
         // start rendering
-        renderManager.start(blueMap.getConfigs().getCoreConfig().resolveRenderThreadCount());
+        renderManager.start(blueMap.getConfig().getCoreConfig().resolveRenderThreadCount());
 
         Timer timer = new Timer("BlueMap-CLI-Timer", true);
         TimerTask updateInfoTask = new TimerTask() {
@@ -187,7 +194,7 @@ public class BlueMapCLI implements ServerInterface {
     public void startWebserver(BlueMapService blueMap, boolean verbose) throws IOException, ConfigurationException, InterruptedException {
         Logger.global.logInfo("Starting webserver ...");
 
-        WebserverConfig config = blueMap.getConfigs().getWebserverConfig();
+        WebserverConfig config = blueMap.getConfig().getWebserverConfig();
         FileHelper.createDirectories(config.getWebroot());
 
         RoutingRequestHandler routingRequestHandler = new RoutingRequestHandler();
@@ -196,13 +203,14 @@ public class BlueMapCLI implements ServerInterface {
         routingRequestHandler.register(".*", new FileRequestHandler(config.getWebroot()));
 
         // map route
-        for (var mapConfigEntry : blueMap.getConfigs().getMapConfigs().entrySet()) {
-            Storage storage = blueMap.getStorage(mapConfigEntry.getValue().getStorage());
+        for (var mapConfigEntry : blueMap.getConfig().getMapConfigs().entrySet()) {
+            MapStorage storage = blueMap.getOrLoadStorage(mapConfigEntry.getValue().getStorage())
+                    .map(mapConfigEntry.getKey());
 
             routingRequestHandler.register(
                     "maps/" + Pattern.quote(mapConfigEntry.getKey()) + "/(.*)",
                     "$1",
-                    new MapRequestHandler(mapConfigEntry.getKey(), storage)
+                    new MapRequestHandler(storage)
             );
         }
 
@@ -238,51 +246,11 @@ public class BlueMapCLI implements ServerInterface {
             throw new ConfigurationException("BlueMap failed to bind to the configured address.\n" +
                     "This usually happens when the configured port (" + config.getPort() + ") is already in use by some other program.", ex);
         } catch (IOException ex) {
-            throw new ConfigurationException("BlueMap failed to initialize the webserver.\n" +
-                    "Check your webserver-config if everything is configured correctly.\n" +
-                    "(Make sure you DON'T use the same port for bluemap that you also use for your minecraft server)", ex);
+            throw new ConfigurationException("""
+                    BlueMap failed to initialize the webserver.
+                    Check your webserver-config if everything is configured correctly.
+                    (Make sure you DON'T use the same port for bluemap that you also use for your minecraft server)""", ex);
         }
-    }
-
-    @Override
-    public MinecraftVersion getMinecraftVersion() {
-        return minecraftVersion;
-    }
-
-    @Override
-    public void registerListener(ServerEventListener listener) {}
-
-    @Override
-    public void unregisterAllListeners() {}
-
-    @Override
-    public Optional<ServerWorld> getWorld(Path worldFolder) {
-        return Optional.empty();
-    }
-
-    @Override
-    public Collection<ServerWorld> getLoadedWorlds() {
-        return Collections.emptyList();
-    }
-
-    @Override
-    public Path getConfigFolder() {
-        return configFolder;
-    }
-
-    @Override
-    public Optional<Path> getModsFolder() {
-        return Optional.empty();
-    }
-
-    @Override
-    public Collection<Player> getOnlinePlayers() {
-        return Collections.emptyList();
-    }
-
-    @Override
-    public Optional<Player> getPlayer(UUID uuid) {
-        return Optional.empty();
     }
 
     public static void main(String[] args) {
@@ -316,7 +284,6 @@ public class BlueMapCLI implements ServerInterface {
             }
 
             //config folder
-            cli.configFolder = Path.of("config");
             if (cmd.hasOption("c")) {
                 cli.configFolder = Path.of(cmd.getOptionValue("c"));
                 FileHelper.createDirectories(cli.configFolder);
@@ -334,7 +301,13 @@ public class BlueMapCLI implements ServerInterface {
                 }
             }
 
-            BlueMapConfigs configs = new BlueMapConfigs(cli, Path.of("data"), Path.of("web"), false);
+            BlueMapConfigManager configs = BlueMapConfigManager.builder()
+                    .minecraftVersion(cli.minecraftVersion)
+                    .configRoot(cli.configFolder)
+                    .usePluginConfig(false)
+                    .defaultDataFolder(Path.of("data"))
+                    .defaultWebroot(Path.of("web"))
+                    .build();
 
             //apply new file-logger config
             CoreConfig coreConfig = configs.getCoreConfig();
@@ -346,7 +319,7 @@ public class BlueMapCLI implements ServerInterface {
                 ));
             }
 
-            blueMap = new BlueMapService(cli, configs);
+            blueMap = new BlueMapService(configs);
             boolean noActions = true;
 
             if (cmd.hasOption("w")) {
@@ -362,7 +335,8 @@ public class BlueMapCLI implements ServerInterface {
                 boolean watch = cmd.hasOption("u");
                 boolean force = cmd.hasOption("f");
                 boolean generateWebappFiles = cmd.hasOption("g");
-                cli.renderMaps(blueMap, watch, force, generateWebappFiles);
+                String mapsToRender = cmd.getOptionValue("m", null);
+                cli.renderMaps(blueMap, watch, force, generateWebappFiles, mapsToRender);
             } else {
                 if (cmd.hasOption("g")) {
                     noActions = false;
@@ -390,9 +364,9 @@ public class BlueMapCLI implements ServerInterface {
             Logger.global.logWarning("BlueMap is missing important resources!");
             Logger.global.logWarning("You must accept the required file download in order for BlueMap to work!");
             if (blueMap != null) {
-                BlueMapConfigProvider configProvider = blueMap.getConfigs();
-                if (configProvider instanceof BlueMapConfigs) {
-                    Logger.global.logWarning("Please check: " + ((BlueMapConfigs) configProvider).getConfigManager().findConfigPath(Path.of("core")).toAbsolutePath().normalize());
+                BlueMapConfiguration configProvider = blueMap.getConfig();
+                if (configProvider instanceof BlueMapConfigManager) {
+                    Logger.global.logWarning("Please check: " + ((BlueMapConfigManager) configProvider).getConfigManager().findConfigPath(Path.of("core")).toAbsolutePath().normalize());
                 }
             }
             System.exit(2);
@@ -458,6 +432,7 @@ public class BlueMapCLI implements ServerInterface {
 
         options.addOption("r", "render", false, "Renders the maps configured in the 'render.conf' file");
         options.addOption("f", "force-render", false, "Forces rendering everything, instead of only rendering chunks that have been modified since the last render");
+        options.addOption("m", "maps", true, "A comma-separated list of map-id's that should be rendered. Example: 'world,nether'");
 
         options.addOption("u", "watch", false, "Watches for file-changes after rendering and updates the map");
 
@@ -469,6 +444,24 @@ public class BlueMapCLI implements ServerInterface {
     private static void printHelp() {
         HelpFormatter formatter = new HelpFormatter();
 
+        String command = getCliCommand();
+
+        @SuppressWarnings("StringBufferReplaceableByString")
+        StringBuilder footer = new StringBuilder();
+        footer.append("Examples:\n\n");
+        footer.append(command).append(" -c './config/'\n");
+        footer.append("Generates the default/example configurations in a folder named 'config' if they are not already present\n\n");
+        footer.append(command).append(" -r\n");
+        footer.append("Render the configured maps\n\n");
+        footer.append(command).append(" -w\n");
+        footer.append("Start only the webserver without doing anything else\n\n");
+        footer.append(command).append(" -ru\n");
+        footer.append("Render the configured maps and then keeps watching the world-files and updates the map once something changed.\n\n");
+
+        formatter.printHelp(command + " [options]", "\nOptions:", createOptions(), "\n" + footer);
+    }
+
+    private static String getCliCommand() {
         String filename = "bluemap-cli.jar";
         try {
             File file = new File(BlueMapCLI.class.getProtectionDomain()
@@ -484,22 +477,7 @@ public class BlueMapCLI implements ServerInterface {
                 }
             }
         } catch (IOException ignore) {}
-
-        String command = "java -jar " + filename;
-
-        @SuppressWarnings("StringBufferReplaceableByString")
-        StringBuilder footer = new StringBuilder();
-        footer.append("Examples:\n\n");
-        footer.append(command).append(" -c './config/'\n");
-        footer.append("Generates the default/example configurations in a folder named 'config' if they are not already present\n\n");
-        footer.append(command).append(" -r\n");
-        footer.append("Render the configured maps\n\n");
-        footer.append(command).append(" -w\n");
-        footer.append("Start only the webserver without doing anything else\n\n");
-        footer.append(command).append(" -ru\n");
-        footer.append("Render the configured maps and then keeps watching the world-files and updates the map once something changed.\n\n");
-
-        formatter.printHelp(command + " [options]", "\nOptions:", createOptions(), "\n" + footer);
+        return "java -jar " + filename;
     }
 
     private static void printVersion() {

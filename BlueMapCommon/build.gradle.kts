@@ -9,10 +9,11 @@ plugins {
     id ("com.github.node-gradle.node") version "3.5.0"
 }
 
-group = "de.bluecolored.bluemap.common"
-version = "0.0.0"
+group = "de.bluecolored.bluemap"
+version = System.getProperty("bluemap.version") ?: "?" // set by BlueMapCore
+val lastVersion = System.getProperty("bluemap.lastVersion") ?: "?" // set by BlueMapCore
 
-val javaTarget = 11
+val javaTarget = 16
 java {
     sourceCompatibility = JavaVersion.toVersion(javaTarget)
     targetCompatibility = JavaVersion.toVersion(javaTarget)
@@ -20,19 +21,18 @@ java {
 
 repositories {
     mavenCentral()
-    maven {
-        setUrl("https://libraries.minecraft.net")
-    }
-    maven {
-        setUrl("https://jitpack.io")
-    }
+    maven ("https://libraries.minecraft.net")
+    maven ("https://repo.bluecolored.de/releases")
 }
 
 dependencies {
     api ("com.mojang:brigadier:1.0.17")
-    api ("de.bluecolored.bluemap.core:BlueMapCore")
+    api ("de.bluecolored.bluemap:BlueMapCore")
 
     compileOnly ("org.jetbrains:annotations:16.0.2")
+    compileOnly ("org.projectlombok:lombok:1.18.30")
+
+    annotationProcessor ("org.projectlombok:lombok:1.18.30")
 
     testImplementation ("org.junit.jupiter:junit-jupiter:5.8.2")
     testRuntimeOnly ("org.junit.jupiter:junit-jupiter-engine:5.8.2")
@@ -99,6 +99,20 @@ tasks.processResources {
 }
 
 publishing {
+    repositories {
+        maven {
+            name = "bluecolored"
+
+            val releasesRepoUrl = "https://repo.bluecolored.de/releases"
+            val snapshotsRepoUrl = "https://repo.bluecolored.de/snapshots"
+            url = uri(if (version == lastVersion) releasesRepoUrl else snapshotsRepoUrl)
+
+            credentials {
+                username = project.findProperty("bluecoloredUsername") as String? ?: System.getenv("BLUECOLORED_USERNAME")
+                password = project.findProperty("bluecoloredPassword") as String? ?: System.getenv("BLUECOLORED_PASSWORD")
+            }
+        }
+    }
     publications {
         create<MavenPublication>("maven") {
             groupId = project.group.toString()
@@ -106,6 +120,12 @@ publishing {
             version = project.version.toString()
 
             from(components["java"])
+
+            versionMapping {
+                usage("java-api") {
+                    fromResolutionOf("runtimeClasspath")
+                }
+            }
         }
     }
 }

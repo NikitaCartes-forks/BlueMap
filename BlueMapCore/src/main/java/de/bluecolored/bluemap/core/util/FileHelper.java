@@ -24,6 +24,8 @@
  */
 package de.bluecolored.bluemap.core.util;
 
+import de.bluecolored.bluemap.core.util.stream.OnCloseOutputStream;
+
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -40,7 +42,7 @@ public class FileHelper {
         final Path partFile = getPartFile(file);
         FileHelper.createDirectories(partFile.getParent());
         OutputStream os = Files.newOutputStream(partFile, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.CREATE);
-        return new WrappedOutputStream(os, () -> {
+        return new OnCloseOutputStream(os, () -> {
             if (!Files.exists(partFile)) return;
             FileHelper.createDirectories(file.getParent());
             FileHelper.move(partFile, file);

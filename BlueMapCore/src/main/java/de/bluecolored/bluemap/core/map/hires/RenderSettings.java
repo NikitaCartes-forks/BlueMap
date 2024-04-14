@@ -24,7 +24,11 @@
  */
 package de.bluecolored.bluemap.core.map.hires;
 
+import com.flowpowered.math.vector.Vector2i;
 import com.flowpowered.math.vector.Vector3i;
+import de.bluecolored.bluemap.core.util.Grid;
+
+import java.util.function.Predicate;
 
 public interface RenderSettings {
 
@@ -66,16 +70,15 @@ public interface RenderSettings {
     float getAmbientLight();
 
     /**
-     * The sky-light level of this world (0-15)
-     */
-    int getWorldSkyLight();
-
-    /**
      * The same as the maximum height, but blocks that are above this value are treated as AIR.<br>
      * This leads to the top-faces being rendered instead of them being culled.
      */
     default boolean isRenderEdges() {
         return true;
+    }
+
+    default boolean isIgnoreMissingLightData() {
+        return false;
     }
 
     default boolean isInsideRenderBoundaries(int x, int z) {
@@ -100,6 +103,22 @@ public interface RenderSettings {
                 z <= max.getZ() &&
                 y >= min.getY() &&
                 y <= max.getY();
+    }
+
+    /**
+     * Returns a predicate which is filtering out all cells of a {@link Grid}
+     * that are completely outside the render boundaries.
+     */
+    default Predicate<Vector2i> getRenderBoundariesCellFilter(Grid grid) {
+        return t -> {
+            Vector2i cellMin = grid.getCellMin(t);
+            if (cellMin.getX() > getMaxPos().getX()) return false;
+            if (cellMin.getY() > getMaxPos().getZ()) return false;
+
+            Vector2i cellMax = grid.getCellMax(t);
+            if (cellMax.getX() < getMinPos().getX()) return false;
+            return cellMax.getY() >= getMinPos().getZ();
+        };
     }
 
     boolean isSaveHiresLayer();

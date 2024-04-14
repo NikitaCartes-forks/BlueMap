@@ -24,41 +24,31 @@
  */
 package de.bluecolored.bluemap.common.config.storage;
 
-import de.bluecolored.bluemap.core.storage.Storage;
-import de.bluecolored.bluemap.core.storage.file.FileStorage;
-import de.bluecolored.bluemap.core.storage.sql.SQLStorage;
+import de.bluecolored.bluemap.core.util.Key;
+import de.bluecolored.bluemap.core.util.Keyed;
+import de.bluecolored.bluemap.core.util.Registry;
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 
-public enum StorageType {
+public interface StorageType extends Keyed {
 
-    FILE (FileConfig.class, FileStorage::new),
-    SQL (SQLConfig.class, SQLStorage::create);
+    StorageType FILE = new Impl(Key.bluemap("file"), FileConfig.class);
+    StorageType SQL = new Impl(Key.bluemap("sql"), SQLConfig.class);
 
-    private final Class<? extends StorageConfig> configType;
-    private final StorageFactory<? extends StorageConfig> storageFactory;
+    Registry<StorageType> REGISTRY = new Registry<>(
+            FILE,
+            SQL
+    );
 
-    <C extends StorageConfig> StorageType(Class<C> configType, StorageFactory<C> storageFactory) {
-        this.configType = configType;
-        this.storageFactory = storageFactory;
-    }
+    Class<? extends StorageConfig> getConfigType();
 
-    public Class<? extends StorageConfig> getConfigType() {
-        return configType;
-    }
+    @RequiredArgsConstructor
+    @Getter
+    class Impl implements StorageType {
 
-    @SuppressWarnings("unchecked")
-    public <C extends StorageConfig> StorageFactory<C> getStorageFactory(Class<C> configType) {
-        if (!configType.isAssignableFrom(this.configType)) throw new ClassCastException(this.configType + " can not be cast to " + configType);
-        return (StorageFactory<C>) storageFactory;
-    }
+        private final Key key;
+        private final Class<? extends StorageConfig> configType;
 
-    @FunctionalInterface
-    public interface StorageFactory<C extends StorageConfig> {
-        Storage provideRaw(C config) throws Exception;
-
-        @SuppressWarnings("unchecked")
-        default Storage provide(StorageConfig config) throws Exception {
-            return provideRaw((C) config);
-        }
     }
 
 }

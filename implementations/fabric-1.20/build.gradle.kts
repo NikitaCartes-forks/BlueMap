@@ -10,12 +10,12 @@ plugins {
 	id("com.diffplug.spotless") version "6.1.2"
 	id ("com.github.node-gradle.node") version "3.0.1"
 	id ("com.github.johnrengelman.shadow") version "7.1.2"
-	id ("fabric-loom") version "1.3-SNAPSHOT"
+	id ("fabric-loom") version "1.5-SNAPSHOT"
 	id ("com.modrinth.minotaur") version "2.+"
 	id ("com.matthewprenger.cursegradle") version "1.4.0"
 }
 
-group = "de.bluecolored.bluemap.fabric"
+group = "de.bluecolored.bluemap"
 version = System.getProperty("bluemap.version") ?: "?" // set by BlueMapCore
 
 val javaTarget = 17
@@ -28,18 +28,10 @@ java {
 
 repositories {
 	mavenCentral()
-	maven {
-		setUrl("https://libraries.minecraft.net")
-	}
-	maven {
-		setUrl("https://jitpack.io")
-	}
-	maven {
-		setUrl("https://maven.fabricmc.net/")
-	}
-	maven {
-		setUrl("https://oss.sonatype.org/content/repositories/snapshots")
-	}
+	maven ("https://libraries.minecraft.net")
+	maven ("https://maven.fabricmc.net/")
+	maven ("https://oss.sonatype.org/content/repositories/snapshots")
+	maven ("https://repo.bluecolored.de/releases")
 }
 
 val shadowInclude: Configuration by configurations.creating
@@ -49,7 +41,7 @@ configurations {
 }
 
 dependencies {
-	shadowInclude ("de.bluecolored.bluemap.common:BlueMapCommon") {
+	shadowInclude ("de.bluecolored.bluemap:BlueMapCommon") {
 		//exclude dependencies provided by fabric
 		exclude (group = "com.google.guava", module = "guava")
 		exclude (group = "com.google.code.gson", module = "gson")
@@ -106,7 +98,7 @@ tasks.shadowJar {
 
 	//relocate ("com.flowpowered.math", "de.bluecolored.shadow.flowpowered.math") //DON"T relocate this, because the API depends on it
 	relocate ("com.typesafe.config", "de.bluecolored.shadow.typesafe.config")
-	relocate ("net.querz.nbt", "de.bluecolored.shadow.querz.nbt")
+	relocate ("de.bluecolored.bluenbt", "de.bluecolored.shadow.bluenbt")
 	relocate ("org.spongepowered.configurate", "de.bluecolored.shadow.configurate")
 	relocate ("com.github.benmanes.caffeine", "de.bluecolored.shadow.benmanes.caffeine")
 	relocate ("org.aopalliance", "de.bluecolored.shadow.aopalliance")
@@ -115,6 +107,7 @@ tasks.shadowJar {
 	relocate ("org.codehaus", "de.bluecolored.shadow.codehaus")
 	relocate ("io.leangen.geantyref", "de.bluecolored.shadow.geantyref")
 	relocate ("io.airlift", "de.bluecolored.shadow.airlift")
+	relocate ("net.jpountz", "de.bluecolored.shadow.jpountz")
 
 	relocate ("com.google.errorprone", "de.bluecolored.shadow.google.errorprone")
 	relocate ("com.google.inject", "de.bluecolored.shadow.google.inject")
